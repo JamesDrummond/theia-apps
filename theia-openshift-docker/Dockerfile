@@ -27,7 +27,7 @@ RUN rm -rf /opt/app-root/src && \
     yum install -y git && \
     ln -s /usr/lib64/libcurl.so.4 /usr/lib64/libcurl-gnutls.so.4
 
-USER 1001
+USER root
 ARG version=latest
 RUN cd /home/theia && \
     yarn && \
@@ -36,6 +36,7 @@ RUN cd /home/theia && \
     yarn cache clean
 RUN chown -R 1001:0 /home/theia /opt/app-root && \
     chmod -R g=u /home/theia /opt/app-root
+USER 1001
 EXPOSE 3000
 ENV SHELL /bin/bash
 ENV USE_LOCAL_GIT true
