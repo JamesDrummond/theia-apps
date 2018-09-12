@@ -1,0 +1,347 @@
+apiVersion: v1
+kind: Template
+metadata:
+  creationTimestamp: null
+  name: devcomb_template
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      description: Exposes and load balances the application pods
+    creationTimestamp: null
+    labels:
+      app: nodejs-theia-example
+      template: nodejs-theia-example
+    name: nodejs-theia-example
+  spec:
+    ports:
+    - name: theia
+      port: 3000
+      protocol: TCP
+      targetPort: 3000
+    - name: web
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      name: nodejs-theia-example
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: proxy-tls
+      service.alpha.openshift.io/serving-cert-signed-by: openshift-service-serving-signer@1531155253
+    creationTimestamp: null
+    labels:
+      app: nodejs-theia-example
+      template: nodejs-theia-example
+    name: nodejs-theia-proxy
+  spec:
+    ports:
+    - name: nodejs-theia-proxy
+      port: 443
+      protocol: TCP
+      targetPort: 8443
+    selector:
+      name: nodejs-theia-proxy
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      openshift.io/generated-by: OpenShiftWebConsole
+    creationTimestamp: null
+    labels:
+      app: text-nginx
+    name: text-nginx
+  spec:
+    ports:
+    - name: 8080-tcp
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      deploymentconfig: text-nginx
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    annotations:
+      description: Defines how to deploy the application server
+      template.alpha.openshift.io/wait-for-ready: "true"
+    creationTimestamp: null
+    generation: 1
+    labels:
+      app: nodejs-theia-example
+      template: nodejs-theia-example
+    name: nodejs-theia-example
+  spec:
+    replicas: 1
+    selector:
+      name: nodejs-theia-example
+    strategy:
+      activeDeadlineSeconds: 21600
+      resources: {}
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          name: nodejs-theia-example
+        name: nodejs-theia-example
+      spec:
+        containers:
+        - env:
+          - name: SEC_PROC
+            value: "true"
+          - name: DEV_MODE
+            value: "true"
+          - name: SEC_DEBUG_COMMAND
+            value: ./node_modules/.bin/gulp
+          - name: GIT_USERNAME
+            value: devcomb
+          - name: GIT_EMAIL
+            value: james@devcomb.com
+          - name: GIT_TOKEN
+            value: b14e9377374ba9d40412772c03a425789a077ab4
+          image: docker-registry.default.svc:5000/theia-example-devcomb/nodejs-theia-example@sha256:d39a6fc0c6eded8754091bc73793c789204a3b6cae0abeebebdee344c51ec712
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 3
+          name: nodejs-theia-example
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources:
+            limits:
+              cpu: 200m
+              memory: 512Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: proxy-tls
+          secret:
+            defaultMode: 420
+            secretName: proxy-tls
+    test: false
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - nodejs-theia-example
+        from:
+          kind: ImageStreamTag
+          name: nodejs-theia-example:latest
+          namespace: theia-example-devcomb
+      type: ImageChange
+    - type: ConfigChange
+  status:
+    availableReplicas: 0
+    latestVersion: 0
+    observedGeneration: 0
+    replicas: 0
+    unavailableReplicas: 0
+    updatedReplicas: 0
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    annotations:
+      description: Defines how to deploy the application server
+      template.alpha.openshift.io/wait-for-ready: "true"
+    creationTimestamp: null
+    generation: 1
+    labels:
+      app: nodejs-theia-example
+      template: nodejs-theia-example
+    name: nodejs-theia-proxy
+  spec:
+    replicas: 1
+    selector:
+      name: nodejs-theia-proxy
+    strategy:
+      activeDeadlineSeconds: 21600
+      resources: {}
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          name: nodejs-theia-proxy
+        name: nodejs-theia-proxy
+      spec:
+        containers:
+        - args:
+          - --https-address=:8443
+          - --provider=openshift
+          - --openshift-service-account=nodejs-theia-proxy
+          - --upstream=http://text-nginx:8080
+          - --tls-cert=/etc/tls/private/tls.crt
+          - --tls-key=/etc/tls/private/tls.key
+          - --cookie-secret=SECRET
+          - --pass-user-headers=true
+          - --set-xauthrequest
+          - --pass-basic-auth
+          image: docker.io/openshift/oauth-proxy:latest
+          imagePullPolicy: IfNotPresent
+          name: oauth-proxy
+          ports:
+          - containerPort: 8443
+            name: public
+            protocol: TCP
+          resources:
+            limits:
+              cpu: 200m
+              memory: 512Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: proxy-tls
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: nodejs-theia-proxy
+        serviceAccountName: nodejs-theia-proxy
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: proxy-tls
+          secret:
+            defaultMode: 420
+            secretName: proxy-tls
+    test: false
+    triggers:
+    - type: ConfigChange
+  status:
+    availableReplicas: 0
+    latestVersion: 0
+    observedGeneration: 0
+    replicas: 0
+    unavailableReplicas: 0
+    updatedReplicas: 0
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    annotations:
+      openshift.io/generated-by: OpenShiftWebConsole
+    creationTimestamp: null
+    generation: 1
+    labels:
+      app: text-nginx
+    name: text-nginx
+  spec:
+    replicas: 1
+    selector:
+      deploymentconfig: text-nginx
+    strategy:
+      activeDeadlineSeconds: 21600
+      resources: {}
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: text-nginx
+          deploymentconfig: text-nginx
+      spec:
+        containers:
+        - env:
+          - name: APPWEB1_ADDR
+            value: nodejs-theia-example:8080
+          - name: APPWEB2_ADDR
+            value: nodejs-theia-example:3000
+          image: docker-registry.default.svc:5000/theia-example-devcomb/text-nginx@sha256:08a6ee1d244fefb66439fbfbfbd9d91ba477fecc556456f4b0dcd25fb068ebc7
+          imagePullPolicy: Always
+          name: text-nginx
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          - containerPort: 8443
+            protocol: TCP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /test
+            name: volume-h83rr
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - configMap:
+            defaultMode: 420
+            name: test-config-map
+          name: volume-h83rr
+    test: false
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - text-nginx
+        from:
+          kind: ImageStreamTag
+          name: text-nginx:latest
+          namespace: theia-example-devcomb
+      type: ImageChange
+    - type: ConfigChange
+  status:
+    availableReplicas: 0
+    latestVersion: 0
+    observedGeneration: 0
+    replicas: 0
+    unavailableReplicas: 0
+    updatedReplicas: 0

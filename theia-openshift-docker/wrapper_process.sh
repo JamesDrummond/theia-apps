@@ -67,6 +67,10 @@ if [ "$SEC_PROC" == true ]; then
   if [ ! "$GIT_REPO_URL" == "" ]; then
     echo "Fetching source code from $GIT_REPO_URL."
     git clone $GIT_REPO_URL /tmp/src
+    if [ ! "$GIT_REPO_REF" == "" ]; then
+      echo "Checkout branch $GIT_REPO_REF."
+      git checkout $GIT_REPO_REF
+    fi
   fi
   if [ "$ASSEMBLE" == true ]; then
     echo "Running assemble code."
