@@ -20,6 +20,8 @@ DEFAULT_GIT_PASSWORD=""
 GIT_PASSWORD=${GIT_PASSWORD:-${DEFAULT_GIT_PASSWORD}}
 DEFAULT_GIT_TOKEN=""
 GIT_TOKEN=${GIT_TOKEN:-${DEFAULT_GIT_TOKEN}}
+DEFAULT_GIT_REPO_REF=""
+GIT_REPO_REF=${GIT_REPO_REF:-${DEFAULT_GIT_REPO_REF}}
 
 cd ${THEIA_DIR}
 if [ ! -z "$GIT_USERNAME" ] ; then
@@ -42,9 +44,12 @@ if [ ! -z "$GIT_TOKEN" ] ; then
     export GIT_REPO_URL=$(echo ${GIT_REPO_URL} | sed -e "s#https://#https://$GIT_USERNAME:$GIT_TOKEN@#g")
     git config --global credential.helper store
     git config --global remote.origin.url ${GIT_REPO_URL}
+    git config --global alias.br ${GIT_REPO_REF}
   fi
 fi
-
+if [ ! -z "$GIT_REPO_REF" ] ; then
+  git checkout $GIT_REPO_REF
+fi
 
 
 cd ${THEIA_RUNTIME_PATH}
